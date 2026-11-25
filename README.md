@@ -1,18 +1,21 @@
 # Blog Gate
 
-A free Streamlit app for auditing blog articles against editorial, SEO, competitor, and originality checks.
+A static HTML blog quality evaluator. Python evaluation runs in the browser through Pyodide, using `blog_gate.py` for the rule checks.
 
 ## Run locally
 
+Serve the folder over HTTP:
+
 ```bash
-python -m pip install -r requirements.txt
-streamlit run blog_gate.py
+python -m http.server 8000
 ```
 
-## Deploy on Streamlit Community Cloud
+Open `http://localhost:8000`.
 
-1. Push this repository to GitHub.
-2. Open Streamlit Community Cloud and choose **Create app**.
-3. Select `fayazahmed018/bloggate`.
-4. Set the main file to `blog_gate.py`.
-5. Deploy.
+## Deploy on GitHub Pages
+
+1. Push `index.html` and `blog_gate.py` to the `main` branch.
+2. Open the repository **Settings → Pages**.
+3. Under **Build and deployment**, select **Deploy from a branch**.
+4. Select `main` and `/ (root)`.
+5. Save and open the generated GitHub Pages URL.

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A browser-based blog quality and SEO evaluation tool.">
+  <title>Blog Gate</title>
+  <style>
+    :root{--bg:#f4f7fb;--card:#fff;--ink:#182235;--muted:#667085;--blue:#315efb;--red:#b42318;--amber:#9a6700;--green:#08783d;--line:#e3e8ef}
+    *{box-sizing:border-box} body{margin:0;font-family:Inter,Segoe UI,system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+    main{max-width:1180px;margin:auto;padding:32px 20px}h1{margin:0 0 6px}header p{margin:0 0 20px;color:var(--muted)}
+    .card{background:var(--card);border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(29,41,57,.08);margin-top:18px}
+    .grid{display:grid;grid-template-columns:1.7fr 1fr;gap:18px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    label{display:block;font-weight:700;margin:12px 0 6px}textarea,input{width:100%;border:1px solid #ccd4e0;border-radius:8px;padding:10px;font:inherit;color:var(--ink)}textarea{min-height:220px;resize:vertical}#allowedUrls{min-height:150px}
+    button{border:0;border-radius:8px;background:var(--blue);color:#fff;padding:12px 18px;font-weight:800;cursor:pointer;margin-top:16px}button:hover{filter:brightness(.95)}
+    .summary{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0 16px}.pill{border-radius:999px;padding:8px 12px;background:#eef2ff;font-weight:800}.pill.fail{background:#fee4e2;color:var(--red)}.pill.warn{background:#fff1cc;color:var(--amber)}.pill.pass{background:#d1fadf;color:var(--green)}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;border-bottom:1px solid var(--line);padding:10px 8px;vertical-align:top}th{font-size:.85rem;color:var(--muted)}.PASS{color:var(--green);font-weight:800}.FAIL{color:var(--red);font-weight:800}.WARN{color:var(--amber);font-weight:800}.INFO{color:var(--muted);font-weight:800}
+    .details{color:var(--muted)}[hidden]{display:none}@media(max-width:800px){.grid,.fields{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<main>
+  <header><h1>Blog Gate</h1><p>Evaluate a blog for structure, links, keyword use, banned wording, and readability—all in your browser.</p></header>
+  <section class="card">
+    <div class="grid">
+      <div><label for="blog">Blog in Markdown</label><textarea id="blog" placeholder="Meta title: ...&#10;Meta description: ...&#10;# Your H1&#10;&#10;..."></textarea></div>
+      <div>
+        <div class="fields">
+          <div><label for="keyword">Target keyword</label><input id="keyword" placeholder="website development cost"></div>
+          <div><label for="domain">Domain</label><input id="domain" value="vatstudio.in"></div>
+        </div>
+        <label for="allowedUrls">Allowed internal URLs</label><textarea id="allowedUrls">https://vatstudio.in/services/website-development
+https://vatstudio.in/services/digital-marketing
+https://vatstudio.in/services/ui-ux-design
+https://vatstudio.in/services/artificial-intelligence-solutions
+https://vatstudio.in/services/business-automation
+https://vatstudio.in/services/creative-content-production
+https://vatstudio.in/services/cloud-technology-services
+https://vatstudio.in/blog/website-development-cost
+https://vatstudio.in/blog/website-development-company
+https://vatstudio.in/blog/digital-marketing
+https://vatstudio.in/blog/ai-chatbots
+https://vatstudio.in/blog/mobile-app-development-cost
+https://vatstudio.in/blog/custom-software-cost
+https://vatstudio.in/blog/brand-identity
+https://vatstudio.in/blog/ui-ux-design</textarea>
+      </div>
+    </div>
+    <button id="evaluate" type="button">Evaluate blog</button>
+  </section>
+  <section id="results" class="card" hidden>
+    <h2>Evaluation results</h2><div id="summary" class="summary"></div>
+    <div style="overflow-x:auto"><table><thead><tr><th>Check</th><th>Result</th><th>Details</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js"></script>
+<script>
+let pyodideReady=null;
+async function preparePython(){
+  if(!pyodideReady){
+    pyodideReady=(async()=>{
+      const pyodide=await loadPyodide();
+      const source=await (await fetch("./blog_gate.py",{cache:"no-store"})).text();
+      pyodide.globals.set("python_source",source);
+      await pyodide.runPythonAsync("exec(python_source, globals())");
+      return pyodide;
+    })();
+  }
+  return pyodideReady;
+}
+
+async function evaluateWithPython(){
+  const button=document.getElementById("evaluate");
+  button.disabled=true;button.textContent="Loading Python engine...";
+  try{
+    const pyodide=await preparePython();
+    pyodide.globals.set("raw_blog",document.getElementById("blog").value);
+    pyodide.globals.set("target_keyword",document.getElementById("keyword").value);
+    pyodide.globals.set("target_domain",document.getElementById("domain").value);
+    pyodide.globals.set("allowed_urls",document.getElementById("allowedUrls").value);
+    await pyodide.runPythonAsync("allowed_lines = [u.strip() for u in allowed_urls.splitlines() if u.strip()]\npython_checks, _, _, _ = run_rules(raw_blog, target_keyword, target_domain, allowed_lines)");
+    const checks=pyodide.globals.get("python_checks").toJs();
+    const rows=Array.from(checks,(item)=>Object.fromEntries(item));
+    const counts={PASS:0,FAIL:0,WARN:0,INFO:0};rows.forEach(c=>counts[c.Result]=(counts[c.Result]||0)+1);
+    document.getElementById("results").hidden=false;
+    document.getElementById("summary").innerHTML=`<span class="pill pass">${counts.PASS||0} passed</span><span class="pill fail">${counts.FAIL||0} failed</span><span class="pill warn">${counts.WARN||0} warnings</span>`;
+    document.getElementById("rows").innerHTML=rows.map(c=>`<tr><td>${escapeHtml(c.Check)}</td><td class="${c.Result}">${c.Result}</td><td class="details">${escapeHtml(c.Details)}</td></tr>`).join("");
+  }catch(error){
+    alert("Python evaluation could not start: "+error.message);
+  }finally{button.disabled=false;button.textContent="Evaluate blog"}
+}
+function escapeHtml(value){return String(value).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}
+</script>
+</body>
+</html>
