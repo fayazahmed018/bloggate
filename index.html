@@ -60,7 +60,7 @@ async function preparePython(){
   if(!pyodideReady){
     pyodideReady=(async()=>{
       const pyodide=await loadPyodide();
-      const source=await (await fetch("./blog_gate.py",{cache:"no-store"})).text();
+      const source=await (await fetch("./blog_gate.py.txt",{cache:"no-store"})).text();
       pyodide.globals.set("python_source",source);
       await pyodide.runPythonAsync("exec(python_source, globals())");
       return pyodide;
